@@ -40,7 +40,7 @@ RTX 4060 需要 **NullMoth**（社区驱动），装在：
 
 EFI 用的是 **ForbiddenItlwm**：AX211 接入 macOS 自带的 `IO80211Family`，**不再需要 HeliPort**。
 
-但 **AirDrop 和无线 Sidecar 在 Sequoia 上不可用**，原因见 §4.4。
+**AirDrop 已在 Sequoia 上验证成功**（ForbiddenItlwm 0.5.1-test1）；无线 Sidecar 仍不可用，见 §4.4。
 
 ### 4. 睡眠需要手动禁用
 
@@ -103,7 +103,8 @@ sudo pmset -a disablesleep 1
 | 音频输入 | ✅ | 内置麦克风 |
 | 电池 / 亮度 / USB | ✅ | |
 | **睡眠唤醒** | ❌ | 固件级恢复失败，建议禁用睡眠 |
-| **AirDrop / 无线 Sidecar** | ❌ | Sequoia 上 AWDL 不可用，见 §4.4 |
+| **AirDrop** | ✅ | ForbiddenItlwm 0.5.1-test1 + BTLEAdvFixup 0.9.0，Sequoia 15.8.2 已修复 AWDL |
+| **无线 Sidecar** | ❌ | 仍依赖额外的 AWDL/视频能力，暂未验证 |
 | **B&O DSP 调音** | ⚠️ | 缺功放 DSP，音色偏"空"，需软件 EQ 补偿 |
 
 ---
@@ -386,33 +387,26 @@ ifconfig en0 | grep "inet "
 
 ```
 "ItlwmAWDLBuildCheck"     = "verified"
-"ItlwmAWDLInterfaceBuild" = "forbidden-0.5.0-test1-sequoia"
+"ItlwmAWDLInterfaceBuild" = "forbidden-0.5.1-test1-sequoia"
 ```
 
-#### 已知限制：AirDrop / Sidecar 不可用
+#### AirDrop 已修复；无线 Sidecar 仍有限制
 
-两个方向都搜不到对方。原因是 macOS 始终没有完成 `awdl0` 接口的创建：
+使用 `ForbiddenItlwm 0.5.1-test1` 和 `BTLEAdvFixup 0.9.0` 后，`awdl0` 可以创建，AirDrop 双向传输已验证成功。
+
+验证命令：
 
 ```bash
-$ ifconfig awdl0
-ifconfig: interface awdl0 does not exist
+ifconfig awdl0
+ioreg -l -w0 | grep -E '"ItlwmAWDL(InterfaceBuild|PoolType)"'
 ```
 
-```bash
-$ ioreg -l | grep ItlwmAWDLSyncProbeStage
-"ItlwmAWDLSyncProbeStage" = "snapshot-not-ready"
-```
+期望结果：
 
-```bash
-$ ioreg -w0 -r -c ItlAWDLInterface -d 1 -l | grep ClientEvent
-"ItlwmAWDLClientEventCount" = 2
-"ItlwmAWDLClientEvents" = (
-  "24785 ms open IOSkywalkNetworkBSDClient r=1 inactive=0 proc=kernel_task",
-  "24785 ms close IOSkywalkNetworkBSDClient r=0 inactive=0 proc=kernel_task ..."
-)
+```text
+ItlwmAWDLInterfaceBuild = forbidden-0.5.1-test1-sequoia
+ItlwmAWDLPoolType = 1
 ```
-
-接口被打开后**同一毫秒内就被关闭**。上游已知问题：[issue #13](https://github.com/retropineaple/ForbiddenItlwm/issues/13)。
 
 无线 Sidecar 依赖同一套 AWDL；有线 Sidecar 还需要 **VideoToolbox HEVC 编码器**，
 本机核显无驱动、NVIDIA 驱动也不提供 VideoToolbox 编码器，因此同样不可用。
@@ -620,7 +614,7 @@ UTBMap.kext
 | 问题 | 状态 | 原因 |
 |---|---|---|
 | 睡眠唤醒 | 部分解决 | 蓝牙致秒醒已解决；但睡着后键鼠唤不醒，硬件似断电 |
-| AirDrop 不可用 | 未解决 | Sequoia 上 `awdl0` 创建失败（上游 issue #13） |
+| AirDrop | 已解决 | `ForbiddenItlwm 0.5.1-test1` 修复 Sequoia 上 `awdl0` 创建失败的问题 |
 | 无线 Sidecar 不可用 | 未解决 | 依赖 AWDL；有线还缺 HEVC 编码器 |
 | 音色偏"空" | 部分解决 | 缺功放 DSP，需软件 EQ |
 | 触控板为轮询模式 | 部分解决 | GPIO 中断所需驱动无法加载 |
@@ -681,7 +675,7 @@ SSDT-I2CTM.aml.bak-178k-*     ← 提速之前的 I2C 时序
 | [国光黑苹果教程 6-3](https://apple.sqlsec.com/6-实用姿势/6-3/) | 触控板中断/GPIO 原理 |
 | [OpenCore](https://github.com/acidanthera/OpenCorePkg) | 引导 |
 | [ForbiddenItlwm](https://github.com/retropineaple/ForbiddenItlwm) | **AX211 原生 WiFi 驱动** |
-| [issue #13](https://github.com/retropineaple/ForbiddenItlwm/issues/13) | Sequoia 上 awdl0 不创建 |
+| [ForbiddenItlwm 0.5.1-test1](https://github.com/retropineaple/ForbiddenItlwm/releases/tag/v0.5.1-test1) | 修复 Sequoia 上 awdl0 创建失败，AirDrop 双向可用 |
 
 ---
 
